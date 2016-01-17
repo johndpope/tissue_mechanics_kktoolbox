@@ -1,0 +1,25 @@
+function [X_o] = shp_translate(X, scale)
+%% translation only
+X = X(:)';
+X_o = [];
+if length(scale(:))==1,
+    for ix = 1:size(X,1);
+        Xtmp = X(ix,:);
+        [xc2 yc2 zc2] = get_xyz_clks(Xtmp);
+        xc2(1)= T;
+        yc2(1) = T;
+        zc2(1) = T;
+        X_o = [[xc2(:)' yc2(:)' zc2(:)']];
+    end
+else
+    scale = scale(:);
+    for ix = 1:size(X,1);
+        Xtmp = X(ix,:);
+        [xc1 yc1 zc1] = get_xyz_clks(Xtmp);
+        xc1(2:end) = xc1(2:end).*scale(1);
+        yc1(2:end) = yc1(2:end).*scale(2);
+        zc1(2:end) = zc1(2:end).*scale(3);
+        X_o = [X_o; [xc1(:)' yc1(:)' zc1(:)']];
+    end
+
+end

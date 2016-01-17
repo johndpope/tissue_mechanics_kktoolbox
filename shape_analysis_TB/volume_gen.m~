@@ -1,0 +1,86 @@
+function [xclks,yclks, zclks, A, V, v, da,CI] = volume_gen(xclks, yclks, zclks, gdim,xdim,ydim,zdim,x_pixel, y_pixel,z_pixel,t,p,Y_LK,F,plotflag)
+%% Optimize the shape parameters using the convolved volume
+%%
+A = 0;V = 0;v = 0;da = 0;
+% %%% Generate the mesh
+% L_max = round(sqrt(length(xclks))-1);
+% [t wt] = gaussquad(gdim, 0, pi);[p wp]= gaussquad(gdim,0,2*pi);[p t]  = meshgrid(p,t);         
+% [Y_LK] = precalc_ylk_cos_sin(p, t, L_max);
+
+
+load data_intensity_psf;%PSF = PSF(87:214,87:214,1,1:128);%PSF = mat2gray(PSF);  % 128
+PSF = mat2gray(smooth3(squeeze(PSF),'gaussian',[5 5 5]));
+
+PSF_fft = fftn(squeeze(PSF), [xdim ydim zdim]);clear  PSF;
+load data_intensity_raw;
+I = mat2gray(smooth3(squeeze(I),'gaussian',[5 5 5]));I2(:,:,1,:) = I; I = I2; clear I2;
+
+
+%%% resize I
+fac = 1;
+for ix = 1:size(I,4), Is(:,:,1,ix) = imresize(I(:,:,1,ix),[round(xdim/fac) round(ydim/fac)]);end;I = Is;clear Is;
+%%% Optimize the parameters
+Xo = [xclks';yclks';zclks'];
+Xo = [Xo;0; 0; -7; 0.5];
+R = volume_gen_objective(Xo,xdim,ydim,zdim,x_pixel, y_pixel,z_pixel,Y_LK, PSF_fft, I, fac,F, 1);
+
+%%%%%
+warning off;global itercount;itercount = 1;
+save data_volume_gen_intermediate;
+disp('Optimization started');
+
+% load data_volume_gen_after_fitting
+load data_volume_gen_intermediate
+
+load data_volume_gen_after_fitting;Xo = X;
+tic
+    
+    options = optimset('MaxFunEvals', 40000,'DiffMaxChange', 10,'DiffMinChange', 1e-1,...
+            'DerivativeCheck','off','GradObj','off','GradConstr','off',...
+            'MaxIter', 400,'Display', 'iter','Diagnostics', 'off','LevenbergMarquardt','on',...
+            'TolCon', 1e-3,'TolFun', 1e-6,'TolX', 1e-16, 'MaxSQPIter',30,...
+            'LargeScale','on', 'LineSearchType','quadcubic',...
+            'PrecondBandWidth',5,'TypicalX',.5 * ones(length(Xo),1),...
+            'MaxPCGIter','max(1,floor(numberOfVariables/2))');        
+warning off;
+%     [X, resnorm,residual,exitflag,output,lambda, Jacobian] = ...
+%         lsqnonlin(@volume_gen_objective,Xo,[],[],options,xdim,ydim,zdim,x_pixel, y_pixel,z_pixel,Y_LK, PSF_fft, I,fac,F,1);warning on;
+
+      [X, exitflag,output] = ...
+        fminsearch(@volume_gen_objective,Xo,options,xdim,ydim,zdim,x_pixel, y_pixel,z_pixel,Y_LK, PSF_fft, I,fac,F,1);warning on;
+      
+        
+        toc
+clks = X(1:length(X)-4);
+nc = round((length(clks))/3);xclks = clks(1:nc);yclks = clks(nc+1:2*nc);zclks =clks(2*nc+1:end);
+save data_volume_gen_after_fitting;
+load data_volume_gen_after_fitting
+%%%% calculating 95% confidence intervals on the estimated parameters
+%%%% Note that the length of residual must be larger than length of clks
+if length(X)<length(residual),
+    CI = nlparci(X, residual, Jacobian);
+end
+
+save data_volume_gen_after_fitting;
+%%% Calculating the approximate errors on the parameters
+% [n, p] = size(Jacobian);
+% [Q,R] = qr(Jacobian,0);
+% mse = sum(abs(residual).^2/(n-p));
+% Rinv = inv(R);
+% Sigma = Rinv*Rinv'*mse;
+%%%%%%%%%%%%%%
+%%% Calculate shape properties of optimized shape
+gdim  = 40;
+L_max = round(sqrt(length(xclks))-1);
+[t wt] = gaussquad(gdim, 0, pi);[p wp]= gaussquad(gdim,0,2*pi);[p t]  = meshgrid(p,t);         
+[Y_LK] = precalc_ylk_cos_sin(p, t, L_max);
+
+c = xclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);x = sum(c.*Y_LK,3);
+c = yclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);y = sum(c.*Y_LK,3);
+c = zclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);z = sum(c.*Y_LK,3);
+X = [reshape(x,gdim^2,1) reshape(y,gdim^2,1) reshape(z,gdim^2,1)];
+[u, v, w] = kk_sph2cart(t,p , 1);% convert coordinates (on the sphere) to the Cartesian
+Y = [reshape(u, length(X), 1) reshape(v, length(X), 1) reshape(w, length(X), 1)];
+C = convhulln(Y);%% Triangulate
+[A, V, v, F_areas, h, H, Eb, da] = triangulated_props(X, C, 1);disp('Optimized-shape properties:');disp([A V v h Eb da]);
+load data_Iobj; figure;montage(Iobj);

@@ -1,0 +1,36 @@
+function intensity_gen(xclks, yclks, zclks)
+%%% given the clks, the basis functionsand the PSF, the 3D intensity image is generated
+
+global Iobj Iobj2 Sfft C_fft Y_LK PSF_fft x_pixel y_pixel z_pixel Xmx Xmy Xmz ffton avInt
+
+xdim = size(Iobj, 1);ydim = size(Iobj, 2);zdim = size(Iobj, 3);
+
+gdim = size(Y_LK,1);
+Xmx(:) = Y_LK*yclks(:);
+Xmy(:) = Y_LK*xclks(:);
+Xmz(:) = Y_LK*zclks(:);
+%%%%%% Generate the binary volume
+Iobj(:) = 0;
+% ix = round(Xmx/x_pixel) + round(xdim/2);iy = round(Xmy/y_pixel) + round(ydim/2);iz = round(Xmz/z_pixel) + round(zdim/2);
+ix = round(Xmx) + round(xdim/2);iy = round(Xmy) + round(ydim/2);iz = round(Xmz) + round(zdim/2);
+
+ixval = find(ix<(xdim+1) & ix>0);ix = ix(ixval);iy = iy(ixval);iz = iz(ixval);
+iyval = find(iy<(ydim+1) & iy>0);ix = ix(iyval);iy = iy(iyval);iz = iz(iyval);
+izval = find(iz<(zdim+1) & iz>0);ix = ix(izval);iy = iy(izval);iz = iz(izval);
+indx = sub2ind(size(Iobj),ix,iy,iz);
+Iobj(indx) = 1;
+
+
+
+% if ffton
+Sfft = fftn((Iobj),[xdim ydim zdim]);
+C_fft = Sfft.*PSF_fft;%%% convolve with PSF
+Iobj(:,:,:)  = ifftn(C_fft);
+% Iobj = fftshift(Iobj);
+% Iobj = fftshift(Iobj,2);
+% % % % % compensate for z shift (128)
+% % %  Iobj2(:,:,1:zdim/2) = Iobj(:,:,(zdim/2 + 1):end);Iobj2(:,:,(zdim/2 + 1):zdim) = Iobj(:,:,1:zdim/2);Iobj = Iobj2;%clear Iobj2;
+% % % % % compensate for x and y shifts (in case of 128 only)
+% % %  Iobj2((xdim/2+1):xdim,:,:) = Iobj(1:xdim/2,:,:);Iobj2(1:xdim/2,:,:) = Iobj((xdim/2+1):xdim,:,:);Iobj = Iobj2;%clear Iobj2;
+% % %  Iobj2(:,(ydim/2+1):ydim,:) = Iobj(:,1:ydim/2,:);Iobj2(:,1:ydim/2,:) = Iobj(:,(ydim/2+1):ydim,:);Iobj = Iobj2;%clear Iobj2;
+% % %  end

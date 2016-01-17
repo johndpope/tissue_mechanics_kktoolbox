@@ -1,0 +1,15 @@
+function b = determine_background(I)
+
+nbins = 100;
+ds = 50;
+background = zeros(size(I,1), size(I,2), 1);
+counter = 0;
+for ix = 1:10:size(I,3)
+    counter = counter + 1;
+    b = b + imopen(I(:,:,ix),strel('disk',ds));
+end
+b = mean(background(:)/counter);
+% % disp(b);
+% % 
+% % [n,xout] = hist(I(:), nbins);
+% % disp(xout(find(n==max(n))));

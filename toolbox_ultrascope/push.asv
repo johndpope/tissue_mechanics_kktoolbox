@@ -1,0 +1,100 @@
+function push(fnpath)
+% Primary UltraScope data Handler (PUSH)!
+%% reads the xml files in given directory and then executes whatever actions are required
+% Example actions are
+% Transfers the data post-acquisition from RAM-drives to SSD with possible
+% intermediate processing and compression.
+%
+% Requires: j2c.m, read_ultrascope_xml.m
+% Author: Khaled Khairy, Janelia Farm Research Campus 2011
+
+%%% hard-coded parameters
+pixel_pitch = 6.5;
+
+%%% find the xml files
+xmlstructs = dir([fnpath '\*.xml']);
+nxml = length(xmlstructs);
+
+%%% declare actions (add more as needed)
+v3d_action = [];        % store the indices of channels for which v3d needs to be activated
+
+%%% parst the xml files
+S = {};     % store the xml struct for each file
+for ix = 1:nxml
+    S{ix} = read_ultrascope_xml([fnpath '\' xmlstructs(ix).name]);
+    if strcmp(S{ix}.v3d, 'y'), v3d_action = [v3d_action ix];end;          %% check for action v3d
+    
+    S{ix} = parse_detection_objective(S{ix});%% parse the detection_objective field to obtain the magnification and na
+    S{ix} = parse_dimensions(S{ix});%%% parse the dimensions field
+    if str2num(S{1}.camera_index)==2, S{ix}.ncameras = 2;else S{ix}.ncameras = 1;end
+end
+
+%% % perform action v3d
+if any(v3d_action)
+    fid = fopen('push_v3d_config.txt','w');
+    %% generate the string to be written to the configuration file
+    %%%% first: define the number of cameras, the image dimensions and the number of frames
+    %%%% we assume that this doesn't change over the channels
+    fprintf('ncameras\t%d\n',S{1}.ncameras);   % this gives the number of images that need to be opened
+    fprintf('nchannels\t%d\n',length(v3d_action));
+    fprintf('xdim\t%d',S{1}.xdim(1));
+    fprintf('ydim\t%d',S{1}.ydim(1));
+    fprintf('zdim\t%d',S{1}.zdim(1));
+    
+    fprintf('voxx\t%f',(pixel_pitch/S{1}.magnification(1)));
+    fprintf('voxy\t%f',(pixel_pitch/S{1}.magnification(1)));
+    fprintf('voxz\t%f',str2num(S{1}.z_step));
+    
+    %%%% second: for every camera list the full pathnames for all images ordered with
+    %%%% hierarchy: channel plane
+    for cix = 1:S{1}.ncameras
+        for ix = 1:length(v3d_action)
+            if ix<10, chnstr = sprintf('0%d',ix);else chnstr = sprintf('%d',ix);end
+            str = sprintf('*CM%d_CHN%s*', cix,chnstr);
+            files = dir([fnpath '\' str '.tif']);
+        end
+        %%
+        fprintf(fid,str);
+        close(fid);
+        %% system call to v3d
+        
+        %%
+    end
+    
+end
+% ------------ parsing functions
+function S = parse_detection_objective(S)
+%%% parse the detection_objective field to obtain the magnification and na
+s = S.detection_objective;
+if str2num(S.camera_index)==2,      % then we have two cameras
+    k = strfind(s,'x'); ts = s(1:k-1);rem= s(k+2:end);c = textscan(ts,'%s %d');
+    S.magnification = c{2};
+    S.na = str2num(rem(1:4));
+    rem = rem(6:end);
+    k = strfind(rem,'x');ts = rem(1:k-1);rem2 = rem(k+2:end);c = textscan(ts,'%s %d');
+    S.magnification(2) = c{2};
+    S.na(2) = str2num(rem2(1:4));
+else                                     % i.e. we only have one camera
+    k = strfind(s,'x'); ts = s(1:k-1);rem= s(k+2:end);c = textscan(ts,'%s %d');
+    S.magnification = c{2};
+    S.na = str2num(rem(1:4));
+end
+
+function S = parse_dimensions(S)
+s = S.dimensions;
+if str2num(S.camera_index)==2,      % then we have two cameras
+    k = strfind(s,'x');
+    comma = strfind(s,',');
+    S.xdim = str2num(s(1:k(1)-1));
+    S.ydim = str2num(s(k(1)+1:k(2)-1));
+    S.zdim = str2num(s(k(2)+1:comma-1));
+    S.xdim(2) = str2num(s(comma+1:k(3)-1));
+    S.ydim(2) = str2num(s(k(3)+1:k(4)-1));
+    S.zdim(2) = str2num(s(k(4)+1:end));
+else                                     % i.e. we only have one camera
+    k = strfind(s,'x');
+    comma = strfind(s,',');
+    S.xdim = str2num(s(1:k(1)-1));
+    S.ydim = str2num(s(k(1)+1:k(2)-1));
+    S.zdim = str2num(s(k(2)+1:comma-1));
+end

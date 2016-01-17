@@ -1,0 +1,28 @@
+function [X_o] = shp_scale_not_inplace(X, scale)
+%% uniformly scales the shape X using the scalar "scale" without
+%% translation
+% X = X(:)';
+X_o = [];
+if length(scale(:))==1,
+    for ix = 1:size(X,1);
+        Xtmp = X(ix,:);
+        [xc1 yc1 zc1] = get_xyz_clks(Xtmp);
+        Xtmp = Xtmp*scale;
+        [xc2 yc2 zc2] = get_xyz_clks(Xtmp);
+        xc2(1)= xc1(1);
+        yc2(1) = yc1(1);
+        zc2(1) = zc1(1);
+        X_o = [X_o; [xc2(:)' yc2(:)' zc2(:)']];
+    end
+else
+    scale = scale(:);
+    for ix = 1:size(X,1);
+        Xtmp = X(ix,:);
+        [xc1 yc1 zc1] = get_xyz_clks(Xtmp);
+        xc1(1:end) = xc1(1:end).*scale(1);
+        yc1(1:end) = yc1(1:end).*scale(2);
+        zc1(1:end) = zc1(1:end).*scale(3);
+        X_o = [X_o; [xc1(:)' yc1(:)' zc1(:)']];
+    end
+
+end

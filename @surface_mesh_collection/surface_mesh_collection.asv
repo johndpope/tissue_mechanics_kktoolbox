@@ -1,0 +1,28 @@
+classdef surface_mesh_collection
+    properties
+        M;
+    end
+    methods
+        function obj = surface_mesh_collection
+           M = {};
+        end
+        function obj = add(obj, X, F)
+            if nargin = 2,
+                obj.M{end+1} = X;
+            elseif nargin ==3
+            obj.M{end+1} = surface_mesh(X,F);
+        end
+        function obj = import_all_X(obj,all_X, all_F)
+            for ix = 1:length(all_X)
+                obj = add(obj,surface_mesh(all_X{ix}, all_F{ix}));
+            end
+        end
+        function plot(obj)
+            figure;
+            for ix = 1:length(obj.T)
+                plot(obj.T{ix});hold on;
+            end
+            hold off
+        end
+    end
+end

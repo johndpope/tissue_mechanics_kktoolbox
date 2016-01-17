@@ -1,0 +1,238 @@
+function stop = DG_opt_plot(X_o,optimValues,state,phys)
+stop = false;
+
+A_o = phys.A_o; 
+V_o = phys.V_o;
+% a_o_bar = phys.a_o_bar;
+v_red_o = phys.v_red_o;
+
+Y = phys.B.Y;
+Y_P = phys.B.Y_P;
+Y_T = phys.B.Y_T;
+Y_PP = phys.B.Y_PP;
+Y_TT = phys.B.Y_TT;
+Y_TP = phys.B.Y_TP;
+p    = phys.B.p;
+t    = phys.B.t;
+w    = phys.B.w;
+C_o = phys.C_o;
+
+global counter
+counter = counter + 1;
+if mod(counter,1) == 0,
+Eb = 0;
+EADE = 0;
+E_stretch = 0;
+E_shear = 0;
+AreaDiff = 0;
+
+X_o = recover_parms(X_o,phys);
+X_o = over_Basis(X_o);
+[xclks yclks zclks] = get_xyz_clks(X_o);
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+gdimp = length(p);gdimt = length(t);
+c = xclks(:)';h = length(c);c = c(ones(gdimp*gdimt,1),:);c = reshape(c,gdimp, gdimt, h); % %
+x = sum(c.*Y,3);
+xp =(sum(c.*Y_P,3));
+xt = (sum(c.*Y_T,3));
+xpp = (sum(c.*Y_PP,3));
+xtt = (sum(c.*Y_TT,3));
+xtp = (sum(c.*Y_TP,3));
+
+c = yclks(:)';h = length(c);c = c(ones(gdimp*gdimt,1),:);c = reshape(c,gdimp, gdimt, h); % %
+y = sum(c.*Y,3);
+yp =(sum(c.*Y_P,3));
+yt = (sum(c.*Y_T,3));
+ypp = (sum(c.*Y_PP,3));
+ytt = (sum(c.*Y_TT,3));
+ytp = (sum(c.*Y_TP,3));
+
+c = zclks(:)';h = length(c);c = c(ones(gdimp*gdimt,1),:);c = reshape(c,gdimp, gdimt, h); % %
+z = sum(c.*Y,3);
+zp =(sum(c.*Y_P,3));
+zt = (sum(c.*Y_T,3));
+zpp = (sum(c.*Y_PP,3));
+ztt = (sum(c.*Y_TT,3));
+ztp = (sum(c.*Y_TP,3));
+%%%%%%%%%%%%%%%%%%%%%%%% Calculate the geometrically important quantities
+X  =[x(:) y(:) z(:)];
+Xt = [xt(:) yt(:) zt(:)];
+Xp = [xp(:) yp(:) zp(:)];
+Xpp = [xpp(:) ypp(:) zpp(:)];
+Xtp = [xtp(:) ytp(:) ztp(:)];
+Xtt = [xtt(:) ytt(:) ztt(:)];
+
+E = dot(Xt,Xt,2);
+F = dot(Xt,Xp,2);
+G = dot(Xp,Xp,2);
+
+%% set up covariant basis (with letter l), and contravariant basis with the letter u
+m_l1 = Xt;
+m_l2 = Xp;
+%%
+SS = (cross(Xt,Xp,2));SSn = sqrt(E.*G-F.*F);
+n = SS./SSn(:,ones(1,3));
+L = dot(Xtt,n,2);
+M = dot(Xtp,n,2);
+N = dot(Xpp,n,2);
+
+%% calculation of geometric properties
+V = abs(1/3.*sum(w.*(dot(X,n,2)).*SSn));
+A = sum(w.*SSn);
+H = -(E.*N + G.*L - 2*F.*M)./(2 * (E.*G-F.*F));
+K = (L.*N - M.*M)./(E.*G-F.*F);
+%% %
+h = 1./A.*sum(H(:).*w.*SSn);
+T = sum(sum(K(:).*w.*SSn))/4/pi;       % total curvature (constant for topology)
+M = sum(w.*H(:).*SSn);         % as in Seifert et al. '91
+a_bar = -M/(4*pi*sqrt(A/4/pi));
+
+Eb = phys.D.^3/2*sum((2.*H(:)-2.*C_o(:)).^2.*w.*SSn)./8/pi;   % reduced bending energy
+
+%% %%%%%%%%%%%%%%
+DGT1 = kk_kron(m_l1, phys.m_u1) + kk_kron(m_l2, phys.m_u2);
+FT  = kk_transpose(DGT1);
+C = kk_mx_mult(FT,DGT1);% right Cauchy-Green deformation tensor
+[res] = real(eig3(reshape(C',3,3,size(C,1)))); % uses vectorized Cardan's formula for root finding
+res = sort(res,1)';
+tol = 1e-4;indx = find(res(1,:)<(tol) & res(1,:)>(-tol));
+if isempty(indx), warning('empty indx');res = sort(res,2,'descend');res(:,3) = [];
+else res(:,indx(1)) = [];
+end
+lambda = sqrt(res); % take square root for finding the principal stretches
+%% calculate energy based on specified constitutive law
+switch phys.model
+    case 'neo Hookean'%% strain energy generalized neo-Hookean solid (AMoS p100)
+        J = lambda(:,1).*lambda(:,2);%
+        I1_bar = (lambda(:,1).^2 + lambda(:,2).^2 + 1)./J.^(2/3); % J = 1 for incompressible materials
+        PHI = phys.D.*(phys.miu_eff./2.*(I1_bar-3) + phys.bulk_eff./2.*(J-1).^2);
+        E_shear = sum(PHI.*phys.SSn_o.*w) ;
+        Eb      =  sum(phys.kb_eff.*(2.*H(:)-2.*C_o(:)).^2.*w.*SSn);   % calculate bending energy as in RBC paper
+        E = E_shear + Eb;
+    case 'Lim'  %% Strain energy Lim et al. 2002
+        %% 
+        beta  = real((lambda(:,1)-lambda(:,2)).^2./2./lambda(:,1)./lambda(:,2));
+        ai = real(lambda(:,1).*lambda(:,2) - 1);     % area_invariant (as function of principal stretches
+        E_stretch_lim   = phys.D * phys.k_stretch_eff./2.* sum((ai.*ai + phys.a3 * ai .*ai.*ai +phys.a4 * ai.*ai.*ai.*ai).*phys.SSn_o.*w) ;
+        E_shear_lim     = phys.D * phys.k_shear_eff .*sum((beta + phys.b1 .* ai .*beta + phys.b2 .* beta.*beta).*phys.SSn_o.*w) ;
+        Eb              = phys.kb_eff.* sum((2.*H(:)-2.*C_o(:)).^2.*w.*SSn);   % calculate bending energy as in RBC paper
+        E_shear = E_stretch_lim + E_shear_lim;
+        E_lim = Eb + E_shear;
+        E = E_lim;
+end
+%% plot
+Vo = 4/3*pi*(A/4/pi)^(3/2);
+% v_red = V/Vo;
+H = reshape(H,size(x));
+subplot(1,2,1);surf(x,y,z,double(H), 'EdgeColor', 'none');
+view(90,-90);axis equal;axis on;axis tight;camlight;lighting gouraud;light;
+
+subplot(1,2,1);
+x(y<ys) = [];
+
+surf(x,y,z,double(H), 'EdgeColor', 'none');
+
+view(-90,0);axis equal;axis on;axis tight;camlight;lighting gouraud;light;
+
+% axis equal;axis on;view(-90,0);
+%patch('vertices',phys.X_vm,'faces',phys.C_vm,'FaceColor','green', 'FaceAlpha', 0.6);
+view(-55,42);axis equal;axis on;axis tight;camlight;lighting gouraud;light;
+
+%str = sprintf('E: %.2f Eb: %.2f  Esh: %.2f   Est: %.2f', E, Eb,full(E_shear), full(E_stretch));
+% str = sprintf('E: %.2f E_b: %.2f  E_s_h_e_a_r and E_s_t_r_e_t_c_h: %.2f', E/Eb, Eb/Eb,full(E_shear)/Eb);
+% title(str);
+% drawnow;
+%lighting phong;
+% clc;
+% disp_clks(X_o);
+
+
+% % % % disp(['Bending Energy: ' num2str(Eb)]);
+% % % % disp(['Total curvature /4/pi: ' num2str(T)]);
+% % % % disp(['delta relative v_red: ' num2str(1 -v_red/v_red_o)]);
+% % % % disp(['delta relative Area: ' num2str(1-A/A_o)]);
+% % % % 
+
+
+%disp(['delta relative a_bar: ' num2str(1-a_bar/a_o_bar)]);
+
+% disp(['v_red: ' num2str(v_red)]);
+% disp(['v_red_o: ' num2str(v_red_o)]);
+%disp(['a_bar: ' num2str(a_bar)]);
+%disp(['a_bar_o: ' num2str(a_o_bar)]);
+end
+
+
+function r = kk_trace(a)
+%%% a is nx9
+%%% returns nx1
+r = a(:,1)+a(:,5)+a(:,9);
+
+function r = kk_transpose(a)
+%%% a is nx9
+%%% returns nx9
+r = [a(:,1) a(:,4) a(:,7) a(:,2) a(:,5) a(:,8) a(:,3) a(:,6) a(:,9)];
+
+function r = kk_mx_det(a)
+%%% a is a nx9 array (each row represents components of a 2nd rank tensor
+%%% returns nx1
+r = a(:,1).*a(:,5).*a(:,9) +...
+    a(:,4).*a(:,8).*a(:,3) +...
+    a(:,7).*a(:,2).*a(:,6) -...
+    a(:,7).*a(:,5).*a(:,3) -...
+    a(:,4).*a(:,2).*a(:,9) -...
+    a(:,1).*a(:,8).*a(:,6);
+
+function r = kk_mx_mult(a,b)
+%%% a and b are assumed to be nx9 arrays -- we are vectorizing matrix
+%%% multiplication.
+%%% returns an nx9 array
+a1 = a(:,1);
+b1 = a(:,2);
+c1 = a(:,3);
+d1 = a(:,4);
+e1 = a(:,5);
+f1 = a(:,6);
+g1 = a(:,7);
+h1 = a(:,8);
+i1 = a(:,9);
+
+a2 = b(:,1);
+b2 = b(:,2);
+c2 = b(:,3);
+d2 = b(:,4);
+e2 = b(:,5);
+f2 = b(:,6);
+g2 = b(:,7);
+h2 = b(:,8);
+i2 = b(:,9);
+
+
+r = [ a1.*a2 + b1.*d2 + c1.*g2 ... 
+      a1.*b2 + b1.*e2 + c1.*h2 ...
+      a1.*c2 + b1.*f2 + c1.*i2 ...
+      a2.*d1 + d2.*e1 + f1.*g2 ...
+      b2.*d1 + e1.*e2 + f1.*h2 ... 
+      c2.*d1 + e1.*f2 + f1.*i2 ...
+      a2.*g1 + d2.*h1 + g2.*i1 ...
+      b2.*g1 + e2.*h1 + h2.*i1 ...
+      c2.*g1 + f2.*h1 + i1.*i2];
+
+
+function [r] = kk_kron(a,b)
+%%% a and b are assumed to be nx3 arrays
+%%% returns an nx9 array
+r  = [a(:,1).*b(:,1) ...
+      a(:,2).*b(:,1) ...
+      a(:,3).*b(:,1) ...
+      a(:,1).*b(:,2) ...
+      a(:,2).*b(:,2) ...
+      a(:,3).*b(:,2) ...
+      a(:,1).*b(:,3) ...
+      a(:,2).*b(:,3) ...
+      a(:,3).*b(:,3)];
+      
+      
+      
+      

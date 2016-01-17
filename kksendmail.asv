@@ -1,0 +1,11 @@
+function kksendmail(mail_addr, subject)
+
+setpref('Internet','SMTP_Server','mailserver.embl-heidelberg.de');
+setpref('Internet','E_mail','khairy@embl.de');
+
+if nargin == 0,sendmail('khairy@embl.de','***MATLAB***');
+else
+    subject = ['MATLAB' subje
+  sendmail(mail_addr,subject);
+end
+

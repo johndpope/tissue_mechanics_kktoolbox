@@ -1,0 +1,177 @@
+function [t,p] = newton_steps_04( t,p,F,maxiter,flag,filename, verbose,face_memb, X)
+% Minimizes the areas of triangles (on the sphere) by iteratively
+% calculating new positions t and p for the vertices.
+% The algorithm uses Newton's method iteratively
+if nargin<6,filename = 'untitled';verbose = 0;end
+if nargin<7, verbose = 0;end
+%% configure
+T = generate_T(X,F);
+miu = 1e-7;
+gamma = 1e0;
+stepfac = 5e-1;
+seps = sqrt(eps);
+dchg = seps;
+%%
+nvert = length(t);nfaces = length(F);p = mod(p,2*pi);X = [t(:);p(:)];
+u = zeros(length(t),1,'double');v = zeros(length(t),1,'double');
+w = zeros(length(t),1,'double');crossqpr = zeros(size(F),'double');
+if flag==0, % check whether the filename exists or not, if not set flag =1
+    str = sprintf('data_temp_newton_steps_%s',filename);
+    if exist(str,'file')==0, flag=1;
+    end
+end
+if flag
+    %%%%% Prepare initial quantities
+    JacPat = sparse( nvert, nfaces);
+    for ix = 1:nvert
+        JacPat(ix,face_memb{ix}) = 1; %% is inefficient -- room for improvement?
+    end
+    JacPat = JacPat';
+    JacPat = sparse([JacPat JacPat]);   % we have two of the same pattern
+    indJ = find(JacPat);
+    JacInd = JacPat;JacInd(indJ) = indJ;    % fill in the jacobian pattern with the indices
+    indVertVal = zeros(length(indJ),6);
+    pos_vec = zeros(size(indJ));        % gives the position of the variable relative to the face definition
+    indcol = zeros(length(indJ), 1, 'uint16');
+    indrow = zeros(length(indJ), 1, 'uint16');
+    
+    for ix = 1:length(indJ),        % loop over the Jacobian Pattern non-zeros
+        if ~mod(ix,5000),disp([num2str(ix) ' of ' num2str(length(indJ))]);end;
+        [row,col] = ind2sub(size(JacPat),indJ(ix));
+        indvec = JacInd(row,:);
+        indvec = indvec(indvec>0);
+        pos_vec(ix) = find(indvec==indJ(ix));
+        indVertVal(ix,:) = JacInd(indvec);
+        indcol(ix)   = col;       %%
+        indrow(ix)   = row;         %% this is used as Areas(indrow) to subtract from areas_plus
+        
+    end
+    
+    Cv = zeros(size(indVertVal));   % the actual coordinates of the faces (as polar angles) t1 t2 t3 p1 p2 p3 are stored in here
+    indCv = sub2ind(size(Cv),1:length(indJ),pos_vec');
+    J = sparse(size(JacPat,1), size(JacPat,2));
+
+    if flag==1, str = sprintf('save data_temp_newton_steps_%s J seps JacPat JacInd indJ indcol indVertVal Cv indCv indvec indrow pos_vec;',filename);eval(str);end
+else
+    str = sprintf('load data_temp_newton_steps_%s ;',filename);eval(str);
+    if verbose, disp('Preallocating Jakobian...');end
+    J(indJ) = ones(size(indJ));     % just to allocate space beforehand
+    if verbose, disp('Done !');end
+end
+
+
+%%%%%%%%%%%%%%%%% Begin iterations %%%%%%%%%%%%%%%%%%%%%
+%  we are taking Newton steps as follows:
+%  assuming that our system of equations (constraints) is Areas(S), we need to find
+%  dS which makes Areas(S+dS) = 0;
+%  According to the first order Taylor expansion:
+%  Areas(S+dS) =  Areas(S) + JT(S).dS      where JT is the transpose of the Jacobian J
+%  We can satisfy the system of equations by taking Newton steps:
+%  We calculate dS by solving the linear system: JT(S).dS = -Areas(S), and then
+%  incrementing S by dS.
+%  The problem is that in general there are more unknowns than there are contraints (equations)
+%  this means that we have many solutions. We restrict dS to the column space of A
+%  to take the shortes dS possible. So dS can be written as dS = J.dV, and dV is obtianed
+%  by solving the system JT(S).dS = JT(S).J(S).dV = -Areas(S),
+%  then we increment S by J.dV
+%  Note the symbol S has been subsituted by X in the code
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%$%%%
+warning off;
+p = mod(p,2*pi);X = [t(:); p(:)];
+% H = abs(T.Hf)/norm(abs(T.Hf),1);
+for iter = 1:maxiter,
+    if verbose, if~mod(iter,10), disp(iter);end;end
+    
+    t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
+    %% % we need the triangle areas (Areas) at the current configuration.
+    %%% Areas is a column vector of length N-4 (where N is the # of vertices).
+    u(:) = cos(pi/2-t(:)).*cos(p(:));
+    v(:) = cos(pi/2-t(:)).*sin(p(:));
+    w(:) = sin(pi/2-t(:)); 
+    crossqpr = cross([u(F(:,2))-u(F(:,1)) v(F(:,2))-v(F(:,1)) w(F(:,2))-w(F(:,1))],[u(F(:,3))-u(F(:,1)) v(F(:,3))-v(F(:,1)) w(F(:,3))-w(F(:,1))],2);
+    Areas = (sqrt(sum(crossqpr.*crossqpr,2)))./2;
+    
+    %% sosi
+    [A2 d] = tri_spherical_prop_loop([pi/2-t(F(:,1)) p(F(:,1))], [pi/2-t(F(:,2)) p(F(:,2))],[pi/2-t(F(:,3)) p(F(:,3))]);
+    d = 1-(max(d')')./(min(d')');
+    Areas = Areas./4/pi;
+    E = gamma*(Areas).^2 + miu*sum((d-T.df).*(d-T.df),2);
+    %    E = Areas;
+    %E = gamma*(Areas-T.Af).^2 + miu*sum((d-T.df).*(d-T.df),2);
+    %E = gamma*(Areas-H).^2;% + miu*sum((d-T.df).*(d-T.df),2);
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% % we need the Jacobian (J) at the current step. J is a (N-4) x N matrix
+    CHG_vec = dchg*X;                           %% generate the finite difference values
+    VAL = JacPat;VAL(indJ) = X(indcol);         %% Values of the current configuration
+    Cv(:) =full(VAL(indVertVal(:)));            % fill in the values without change first
+    Cv(indCv) = X(indcol)+CHG_vec(indcol);
+    
+    %%%% Calculate the Areas with the new values
+    u1 = cos(pi/2-Cv(:,1)).*cos(Cv(:,4));u2 = cos(pi/2-Cv(:,2)).*cos(Cv(:,5));u3 = cos(pi/2-Cv(:,3)).*cos(Cv(:,6));
+    v1 = cos(pi/2-Cv(:,1)).*sin(Cv(:,4));v2 = cos(pi/2-Cv(:,2)).*sin(Cv(:,5));v3 = cos(pi/2-Cv(:,3)).*sin(Cv(:,6));
+    w1 = sin(pi/2-Cv(:,1));              w2 = sin(pi/2-Cv(:,2));              w3 = sin(pi/2-Cv(:,3));
+    crossqpr = cross([u2-u1 v2-v1 w2-w1],[u3-u1 v3-v1 w3-w1],2);
+    areas_plus = (sqrt(sum(crossqpr.*crossqpr,2)))./2;
+    
+    %% sosi
+    V1 = [pi/2-Cv(:,1) Cv(:,4)];
+    V2 = [pi/2-Cv(:,2)  Cv(:,5)];
+    V3 = [pi/2-Cv(:,3) Cv(:,6)];
+    [areas_plus2 dp] = tri_spherical_prop_loop(V1, V2, V3);
+    dp = 1-(max(dp')')./(min(dp')');
+    areas_plus = areas_plus/4/pi;
+%    E_plus = areas_plus;
+      E_plus = gamma*(areas_plus).^2+ miu*sum((dp-T.df(indrow)).*(dp-T.df(indrow)),2);
+ %   E_plus = gamma*(areas_plus-H(indrow)).^2;
+    %areas_plus = gamma*abs(areas_plus-TAv(indcol));% + miu*sum((dp-Tdv(indcol)).*(dp-Tdv(indcol)),2);
+    %%
+
+    Jvals = (E_plus-E(indrow))./CHG_vec(indcol);
+    J(indJ) = Jvals;
+    J(isnan(J)) = 0;  J(isinf(J)) = 1000;
+    %%% Calculate the solution
+    [dv,flag4,relres4,iter4,resvec4]  = gmres(J*J',-E,1, 5e0, 10);
+    disp(cond(J*J'));
+    disp(norm(-E-(J*J')*dv)/norm(-E));
+    
+    %%% and take a step
+    X = X + stepfac.*J'*dv;
+    
+    %%% plot current configuration if desired
+    if verbose==2,
+        t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
+        u(:) = cos(pi/2-t(:)).*cos(p(:));v(:) = cos(pi/2-t(:)).*sin(p(:));w(:) = sin(pi/2-t(:));
+        fcol = (E);
+        dfig(1);clf; 
+%         patch('Vertices',[u v w],'Faces',F,'FaceVertexCData', fcol,'FaceColor','flat');axis square;
+        patch('Vertices',[u v w],'Faces',F,'FaceVertexCData', 0.5 * ones(length(F),1)','FaceColor','flat');axis square;
+        view(-82,18);zoom(1);colorbar;drawnow;
+    end
+    dfig(2);clf;
+%     bar(Areas-T.Af);
+    bar(fcol);
+    ylim([-max(fcol) max(fcol)]);
+%     Areas_last = Areas;
+    
+end
+%%% plot current configuration at the end if desired
+t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
+if verbose,
+    u(:) = cos(pi/2-t(:)).*cos(p(:));v(:) = cos(pi/2-t(:)).*sin(p(:));w(:) = sin(pi/2-t(:));
+    fcol = hsv(size(F,1));
+    clf; patch('Vertices',[u v w],'Faces',F,'FaceVertexCData', fcol,'FaceColor','flat');axis square;
+    view(-82,18);zoom(1);drawnow;
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [A D] = tri_spherical_prop_loop(V1, V2, V3)
+A= zeros(size(V1,1),1);
+D = zeros(size(V1,1), 3);
+for(ix = 1:size(V1,1))
+    [a d] = tri_spherical_prop(V1(ix,:), V2(ix,:), V3(ix,:));
+    A(ix) = abs(a);
+    D(ix,:) = abs(d);
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

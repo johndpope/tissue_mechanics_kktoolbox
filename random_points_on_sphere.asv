@@ -1,0 +1,27 @@
+function [x y z t p] = random_points_on_sphere(n)
+% generate a set of n*4 random points on the sphere
+% method of Marsalgia 1972.
+
+%% first quarter
+ u0 = rand(2*n,1);
+ u1 = rand(2*n,1);
+ ind = (u0.^2 + u1.^2) <1;
+ u0 = u0(ind);if length(u0)>n, u0 = u0(1:n);end
+ u1 = u1(ind);if length(u1)>n, u1 = u1(1:n);end
+ 
+ x1 = 2*u0.*sqrt(1-u0.^2-u1.^2);
+ y1 = 2*u1.*sqrt(1-u0.^2-u1.^2);
+ z1 = 1-2*(u0.^2+u1.^2);
+ %% second quarter
+ u0 = rand(2*n,1);
+ u1 = rand(2*n,1);
+ ind = (u0.^2 + u1.^2) <1;
+ u0 = u0(ind);if length(u0)>n, u0 = u0(1:n);end
+ u1 = u1(ind);if length(u1)>n, u1 = u1(1:n);end
+ 
+ x1 = 2*u0.*sqrt(1-u0.^2-u1.^2);
+ y1 = 2*u1.*sqrt(1-u0.^2-u1.^2);
+ z1 = 1-2*(u0.^2+u1.^2);
+ 
+ 
+ [t,p,r] = kk_cart2sph(x, y, z);

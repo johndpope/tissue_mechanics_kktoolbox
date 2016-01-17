@@ -1,0 +1,59 @@
+function [Xout Fout tout pout] = regular_sampling_after_conformal_mapping(X, t, p, dim)
+% given a mesh and a t p distribution (after conformal mapping)
+% we need to refine (and thus interpolate) the sampling on the sphere for x y and z
+% nico = 6;
+% pix = find(p(p<3*(-pi)/4));pm1 = p(pix)+pi;tm1 = t(pix);Xm1 = X(pix,:);
+% pix = find(p(p>3*pi/4));pp1 = p(pix)-pi;tp1 = t(pix);Xp1 = X(pix,:);
+% p = [pm1; p; pp1];
+% X = [Xm1;X;Xp1];
+% t = [tm1;t;tp1];
+% 
+% Fx = TriScatteredInterp(t,p,X(:,1));Fx.Method = 'linear';
+% Fy = TriScatteredInterp(t,p,X(:,2));Fy.Method = 'linear';
+% Fz = TriScatteredInterp(t,p,X(:,3));Fz.Method = 'linear';
+
+
+[xd yd zd] = kk_sph2cart(t,p,1);
+DT  = DelaunayTri;
+DT.X = [xd(:) yd(:) zd(:)];
+
+Fx = TriScatteredInterp(DT,X(:,1));Fx.Method = 'nearest';
+Fy = TriScatteredInterp(DT,X(:,2));Fy.Method = 'nearest';
+Fz = TriScatteredInterp(DT,X(:,3));Fz.Method = 'nearest';
+%% generate the new mesh
+%[X,F]=BuildSphere(nico);
+
+P = partsphere(dim^2);
+x = reshape(P(1,:),dim,dim);
+y = reshape(P(2,:),dim,dim);
+z = reshape(P(3,:),dim,dim);
+Xm = double([x(:) y(:) z(:)]);
+
+[tout pout] = kk_cart2sph(Xm(:,1),Xm(:,2),Xm(:,3));
+[Fout] = convhulln(Xm, {'Qt'});
+%% calculate interpolated points
+% x = Fx(tout, pout);y = Fy(tout, pout);z = Fz(tout, pout);
+xo = Fx(x,y,z);yo = Fy(x,y,z);zo = Fz(x,y,z);
+Xout = [xo(:) yo(:) zo(:)];
+% [Xout, Fout] = meshcheckrepair(Xout,Fout,'duplicated');
+% [Xout, Fout] = meshcheckrepair(Xout,Fout,'isolated');
+% [Xout, Fout] = meshcheckrepair(Xout,Fout,'deep', '99');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,72 @@
+function [I] = fix_hot_pixels(I)
+%%% Output: I with hot pixels replaced by median of surrounding pixels
+
+%%% configure
+pats = 3;
+%%%%
+h = {};
+disp(['Gathering data for finding hot pixels ... ']);
+counter = 1;
+overall_indx = {};
+for plnix = 1:size(I,3)
+    im = mat2gray(I(:,:,plnix));
+    %%% determine the hot pixels in this frame
+    b = background2D(im);
+    im = im-b;
+    immed = medfilt2(im);
+    im = im-immed;
+    im = mat2gray(im);
+    b = background2D(im);
+    im = mat2gray(im-b);
+    level = graythresh(im);
+    BW = im2bw(im, level);
+    overall_indx{counter} = find(BW);
+    counter = counter+1;
+end
+disp('Filtering found sets');
+vec = overall_indx{1};
+for ix = 2:length(overall_indx)
+    disp(length(vec));
+    vec  = intersect(vec, overall_indx{ix});
+end
+
+%% %%%%%%%%%%%%%%%% get legal patches around hot spots
+counter = 1;
+hp = cell(length(vec),1);
+for ix = 1:length(vec)
+    [r c] = ind2sub(size(im), vec(ix));
+    vecy = r-pats:r+pats;
+    vecy = vecy(vecy>1);
+    vecy = vecy(vecy<size(I,1));
+    vecx = c-pats:c+pats;
+    vecx = vecx(vecx>1);
+    vecx = vecx(vecx<size(I,2));
+    [vx vy] = meshgrid(vecx, vecy);
+    patch = sub2ind(size(im), vy(:), vx(:));
+    hp{counter}.patch = patch;
+    hp{counter}.ix = sub2ind(size(im), r, c);
+    hp{counter}.r = r;
+    hp{counter}.c = c;
+    counter = counter + 1;
+end
+%%%%%% replace the hot pixels with the patches around them
+for ix = 1:length(hp)
+    im(hp{ix}.ix) = median(im(hp{ix}.patch)) ;
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

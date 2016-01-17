@@ -1,0 +1,84 @@
+function [Y_LK, P_LK NLK_vec]= precalc_ylk_cos_sin(phi, theta, L_max)
+%% Pre-calculate the normalized associated Legendre functions
+%% up to L = L_max
+global plk
+%plk = [];
+%%%%% The following has been tested and works!
+gdimp = length(phi);
+gdimt = length(theta);
+NLK_vec = [];
+Y_LK = zeros(gdimp, gdimt, (L_max+1)^2); 
+P_LK = zeros(gdimp, gdimt, (L_max+1)^2); 
+counter = 0;%
+for L = 0:L_max
+    plk_mat = legendre(L,cos(theta(:)'));
+    for K = -L:L
+        counter = counter + 1;
+        plk = reshape(plk_mat(abs(K)+1,:),size(theta,1),size(theta,2));
+        NLK = N_LK(L,K);%sqrt((2 * L + 1)/(4*pi) * factorial(L - (K))/factorial(L + (K)));
+        NLK_vec(counter) = NLK;
+        %fac = (-1)^(K).*factorial(L-abs(K))./factorial(L+abs(K));
+        %CS = 1;%(-1)^K;
+        if K ==0 & L ==0
+			Y_LK(:,:,counter) =  NLK.*plk;
+            P_LK(:,:,counter) =  plk;
+		elseif K >=0,
+            P_LK(:,:,counter) = (plk);
+            Y_LK(:,:,counter) = NLK.* plk.*cos(K.*phi);
+        elseif K<0,
+            Y_LK(:,:,counter) = NLK.*plk.* sin(abs(K).*phi);
+%             Y_LK(:,:,counter) = fac*NLK.* squeeze(plk(abs(K)+1,:,:)).* sin(abs(K).*phi);            
+            P_LK(:,:,counter) = plk;
+%            P_LK(:,:,counter) =  factorial(L-pK)./factorial(L+pK).*squeeze(plk(abs(K)+1,:,:));
+        end
+     end
+end
+
+%%%%%%%%%% Try the recursion relations here also
+% for L = 0:L_max
+%         p = plk_gen(L,cos(theta), theta, 0);   
+%     for K = -L:L
+%         counter = counter + 1;
+%         NLK = sqrt((2 * L + 1)/(4*pi) * factorial(L - abs(K))/factorial(L + abs(K)));
+%         NLK_vec(counter) = NLK;
+%         if K >= 0,
+%             Y_LK(:,:,counter) =  NLK * plk(:,:, K+1).* cos(K * phi);
+%             P_LK(:,:,counter) =  plk(:,:,K+1);
+%         elseif K < 0,
+%             pK = abs(K);
+%             Y_LK(:,:,counter) =  NLK * plk(:,:,abs(K)+1).* sin(abs(K) * phi);
+%             P_LK(:,:,counter) =  (-1)^pK * factorial(L-pK)/factorial(L+pK).*plk(:,:,abs(K)+1);
+% 
+%         end
+%      end
+% end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+function p = plk_gen(L,ct, theta,K)
+%%% Calculate the derivative of the associated legendre functions using the
+%%% recursion relations from Duncan and Olson '93 (also see Hobson p291)
+%%% The values generated correspond to unnormalized associated Legendre
+%%% functions.  0<=K<=L
+global plk
+if K == L,      % This is the last call
+    if K == 0 ,
+        plk = zeros(length(theta), length(theta), L+1);
+    end
+    p =  factorial(2*L)/factorial(L) * (sin(theta)/2).^L;
+	plk(:,:,K+1) = p;
+elseif K > L,
+    p = zeros(size(theta));
+elseif K < L,
+    if K == 0 ,
+        plk = zeros(length(theta), length(theta), L+1);
+    end
+	plkp1 = plk_gen(L,ct,theta, K+1);
+	plkp2 = plk_gen(L,ct,theta, K+2);
+    p = 1/(L-K)/(L+K+1) * (2*(K+1).*cot(theta).*plkp1 - plkp2);
+	plk(:,:,K+1) = p ;
+end
+
+% 
+
+
+

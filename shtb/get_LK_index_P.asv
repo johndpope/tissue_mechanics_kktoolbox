@@ -1,0 +1,11 @@
+function ix = get_LK_index(L,K)
+% assuming our usual arrangement of indices L and K, we get the linear
+% index reflecting the position of the L,K pair
+
+for l = 0:L+1
+    for k = 0:l
+        
+
+lcol = (l==L);
+mcol = (m==K);
+ix = find(sum([lcol(:) mcol(:)],2)==2);

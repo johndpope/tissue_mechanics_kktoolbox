@@ -1,0 +1,27 @@
+function s = read_shp_surface_ascii(fn)
+%% needs to be updated to the latest format including additional scalar fields
+%% generate a shape s and read the clks from file generated using the c++ class shp_surface
+dim = 60;
+fid = fopen(fn);
+n_shapes = fscanf(fid,'n_shapes = %d\n',1);
+L = fscanf(fid, 'L_max = %d\n', 1);
+n_components = fscanf(fid,'n_components = %d\n',1);
+nc = (L+1)*(L+1);
+for(ix = 1:n_components)
+    tags{ix} = fscanf(fid,'%s\t', 1);
+end
+    X = fscanf(fid,'%e\t', [n_components nc]);
+fclose(fid);
+
+b = sh_basis(L,dim);
+s = shp_surface(b);
+X = X(1:3)';
+s.X_o = X(:);
+
+if n_components>3
+for ix = 4:n_components
+    g = sh_surface(L,b);
+    g.xc = 
+    isf = {tags{ix}, g};
+    s.sf{ix-3} = isf;
+end

@@ -1,0 +1,113 @@
+function R = volume_gen_objective(Xo,xdim, ydim, zdim,x_pixel, y_pixel,z_pixel,Y_LK, PSF_fft,I,fac, F,plotflag)
+%%% Objective function that calculates the residual vector for the difference between the 
+%%% true raw data volume and the convolved  model volume.
+clks = Xo(1:length(Xo)-4);
+xshift = Xo(end-3);yshift = Xo(end-2);zshift = Xo(end-1);
+scale = Xo(end);
+nc = round(length(clks)/3);xclks = clks(1:nc);yclks = clks(nc+1:2*nc);zclks =clks(2*nc+1:end);
+gdim = size(Y_LK,1);
+% c = xclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);x = sum(c.*Y_LK,3);
+% c = yclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);y = sum(c.*Y_LK,3);
+% c = zclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);z = sum(c.*Y_LK,3);
+% Xm = [reshape(x,gdim^2,1) reshape(y,gdim^2,1) reshape(z,gdim^2,1)];
+
+xclks = xclks';yclks =yclks';zclks = zclks';
+Xm = [sum(xclks(ones(gdim,1),:).*Y_LK,2)  sum(yclks(ones(gdim,1),:).*Y_LK,2) sum(zclks(ones(gdim,1),:).*Y_LK,2)];
+Xm = [Xm(:,1)+xshift Xm(:,2)+yshift Xm(:,3)+zshift]; 
+%%%%%% Generate the binary volume
+Iobj = zeros(xdim, ydim, 1, zdim);
+ix = round(Xm(:,1)/x_pixel) + round(xdim/2);iy = round(Xm(:,2)/y_pixel) + round(ydim/2);iz = round(Xm(:,3)/z_pixel) + round(zdim/2);
+ixval = find(ix<(xdim+1) & ix>0);ix = ix(ixval);iy = iy(ixval);iz = iz(ixval);
+iyval = find(iy<(ydim+1) & iy>0);ix = ix(iyval);iy = iy(iyval);iz = iz(iyval);
+izval = find(iz<(zdim+1) & iz>0);ix = ix(izval);iy = iy(izval);iz = iz(izval);
+indx = sub2ind(size(Iobj),iy,ix,ones(length(iy),1),iz);
+Iobj(indx) = 1;
+for ix = 1:zdim,Iobj(:,:,1,ix) = imfill(Iobj(:,:,1,ix));end
+clear ix iy iz
+%% convolve with PSF
+Sfft = fftn(squeeze(Iobj),[128 128 128]);
+%Sfft = fftn(squeeze(Iobj),[128 128 256]);save Sfft Sfft;PSF_fft = fftn(squeeze(PSF), size(Sfft));clear  PSF;
+%%%%%%%%%%%%%%%%%%
+C_fft = Sfft.*PSF_fft;%clear Sfft PSF_fft; %disp('Performing multiplication in Fourier space');
+C = ifftn(C_fft);%C = C./max(max(max(C)));%disp('Inverse Fourier transform and normalization');
+%%%%%%%%%%%%%%%%%
+% C = C(:,:,65:192);
+for ix = 1:zdim,Iobj(:,:,1,ix) = C(:,:,ix);end;
+% compensate for z shift (128)
+% Iobj2(:,:,1,1:64) = Iobj(:,:,1,65:end);Iobj2(:,:,1,65:128) = Iobj(:,:,1,1:64);Iobj = Iobj2;%clear Iobj2;
+% compensate for x and y shifts (in case of 128 only)
+Iobj2(65:128,:,1,:) = Iobj(1:64,:,1,:);Iobj2(1:64,:,1,:) = Iobj(65:128,:,1,:);Iobj = Iobj2;%clear Iobj2;
+Iobj2(:,65:128,1,:) = Iobj(:,1:64,1,:);Iobj2(:,1:64,1,:) = Iobj(:,65:128,1,:);Iobj = Iobj2;clear Iobj2;
+Iobj = mat2gray(Iobj);
+
+% fac = 4;
+Is = zeros(round(xdim/fac), round(ydim/fac), 1, round(zdim));
+for ix = 1:zdim,Is(:,:,1,ix) = imresize(Iobj(:,:,ix),[round(xdim/fac) round(ydim/fac)]);end;Iobj = Is;clear Is;
+
+I2 = zeros(size(I,1),size(I,2),1,size(Iobj,4));
+I2(:,:,1,1:size(I,4)) = I;
+I = I2;
+%%% Calculate the residual
+% counter = 0;
+% for ix = 33:(128-32)
+%  for ix = 33:(110)    
+%     
+% %     counter = counter + 1;R(counter) = 1-corr2(Iobj(1:32,1:32,1,ix),I(1:32,1:32,ix)); % corr of quadrant
+% %     counter = counter + 1;R(counter) = 1-corr2(Iobj(1:32,33:end,1,ix),I(1:32,33:end,ix)); % corr of quadrant
+% %     counter = counter + 1;R(counter) = 1-corr2(Iobj(33:end,33:end,1,ix),I(33:end,33:end,ix)); % corr of quadrant
+% %     counter = counter + 1;R(counter) = 1-corr2(Iobj(33:end,1:32,1,ix),I(33:end,1:32,ix)); % corr of quadrant
+% %     counter = counter + 1;R(counter) = sum(sum(abs(Iobj(:,:,1,ix)-I(:,:,1,ix))));
+%      counter = counter + 1; R(counter) = 1-corr2(Iobj(:,:,1,ix),I(:,:,ix));
+% end
+% pack
+% %%% for subtraction case
+% sr = 33:(128-33);
+% sr = 35:3:90;
+% R = abs(Iobj(:,:,1,sr)-scale * I(:,:,1,sr));
+% R = reshape(R,size(R,1) * size(R,2) *size(R,4),1);
+
+for ix = 1:size(Iobj,4),   % loop over the frames
+    R(ix) = sum(sum((Iobj(:,:,1,ix)-scale*I(:,:,1,ix)).^2));
+end
+
+% R = sum((Iobj(:,:,1,ix)-scale*I(:,:,1,ix)).^2,2)
+
+% figure(1); plot(R);drawnow;
+% figure(4); plot(clks);drawnow;
+% R = sum(R.^2);  %if using simplex
+
+% R = Iobj(:,:,1,33:128-32) -  I(:,:,1,33:128-32);    % take only central 64 frames for fitting
+% R = reshape(R,[xdim*ydim*64 1]);
+
+if plotflag,
+    global itercount;
+%     disp(itercount);
+     itercount = itercount + 1;
+%      if mod(itercount,nc*3 +2) == 0
+        hold off;
+%         close all;
+%         gdim = 40;
+%         [t wt]= gaussquad(gdim, 0, pi);[p wp]= gaussquad(gdim,0,2*pi);
+%         [p t] = meshgrid(p,t);[Y_LK_plot]= precalc_ylk_cos_sin(p, t, round(sqrt(nc)-1));
+%         c = xclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);x = sum(c.*Y_LK_plot,3);
+%         c = yclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);y = sum(c.*Y_LK_plot,3);
+%         c = zclks';h = length(c);c = c(ones(gdim^2,1),:);c = reshape(c,gdim, gdim, h);z = sum(c.*Y_LK_plot,3);
+%         Xm = [reshape(x,gdim^2,1) reshape(y,gdim^2,1) reshape(z,gdim^2,1)];
+%         [u, v, w] = kk_sph2cart(t,p , 1);% convert coordinates (on the sphere) to the Cartesian
+%         Y = [reshape(u, length(Xm), 1) reshape(v, length(Xm), 1) reshape(w, length(Xm), 1)];
+%         C = convhulln(Y);%% Triangulate
+
+subplot(2,1,1);
+        patch('Vertices', Xm, 'Faces', F,'FaceColor', 'red','EdgeColor','none');daspect([1 1 1]);axis off;
+        light; lighting gouraud;
+        view(3);
+        figure(1);[A, V, v] = triangulated_props(Xm, F,0);
+        str = sprintf('Area: %.4f    Vol.: %.4f  v: %.4f',A,-V,-v);title(str);
+        
+%         figure(2);surf(x,y,z,sqrt(x.^2+y.^2+z.^2));grid off;daspect([1 1 1]);
+subpl
+        montage(mat2gray((Iobj-scale*I).^2));hold off;
+        drawnow;
+        save data_Iobj Iobj;
+%      end
+end

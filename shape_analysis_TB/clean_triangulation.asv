@@ -1,0 +1,20 @@
+function [X2, F2] = clean_triangulation(X, F, Fa)
+%%% Cleans the triangulation from repetitive vertices
+%%% and faces with zero area.
+ind = 1:length(F);Fr = find(Fa==0);   % finds the faces that will be removed
+F2 = F;
+for ix = 1:length(Fr),       % loop over the removed vertices
+    r = Fr(1);              % this is the index to be removed
+    F2 = F2(ind(1:end-ix+1)~=r,:);
+    Fr = Fr(2:end)-1;%clip Fr by one.
+end
+
+%%% now remove the duplicate vertices
+X2 = X;
+for ix = 1:length(X2)
+    xd = X2(ix,:);
+    Xd = xd(ones(length(X2),1),:);
+    dup = sum(X2==Xd,'rows')==3;    % finds the rows that are identical
+    dup = find(dup);
+    if isempty(dup), error('Vertex not found');end
+    if  length(dup)>1, [X2,F2] = remove_unused_verices(X,F,R)
