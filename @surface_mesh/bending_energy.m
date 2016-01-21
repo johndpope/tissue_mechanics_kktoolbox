@@ -1,4 +1,4 @@
-function [Eb, A, V, H, M, ddA] = bending_energy(obj, H, M, ddA, Co, px, Links, T)
+function [Eb, A, V, H, M, ddA, n, F_areas] = bending_energy(obj, H, M, ddA, Co, px, Links, T)
 %% The routine calculates the Area
 %% (A), the volume (V) and the local mean curvature
 %% it is meant to be used for calculating changes in energy when one vertex (ix) is perturbed

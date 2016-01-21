@@ -1,4 +1,4 @@
-function [Eb, H, M, ddA, A, V] = bending_energy_prep(obj, Co)
+function [Eb, H, M, ddA, A, V, n, F_areas] = bending_energy_prep(obj, Co)
 %% The routine calculates the Area
 %% (A), the volume (V) and the local mean and total mean curvatures (H and h) of the shape.
 %%

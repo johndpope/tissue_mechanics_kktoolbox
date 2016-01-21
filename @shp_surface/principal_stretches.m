@@ -174,4 +174,4 @@ function [lambda1 lambda2] = principal_stretches(obj,obj_o)
 % % % disp(['AMoS p665 (loops)beta from principal str    :  ' num2str(E_shear2)]);
 % % % disp(['AMoS p665 (vectorized) beta from prin str   :  ' num2str(E_shear3)]);
 % % % disp(['midplane lagrange strain tensor (loops)     :  ' num2str(E_shear5)]);
-disp(['in-plane shear strain as in AoPaS page 214  :  ' num2str(E_shear6)]);
+% % % disp(['in-plane shear strain as in AoPaS page 214  :  ' num2str(E_shear6)]);
