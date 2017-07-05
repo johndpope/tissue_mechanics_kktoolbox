@@ -27,7 +27,7 @@ function [xx, ww] = gaussquad(n, a, b)
 %   URL:         http://home.online.no/~pjacklam
 
    % Check number of input arguments.
-   error(nargchk(1, 3, nargin));
+   %error(nargchk(1, 3, nargin));
 
    % Assign default values to missing arguments.
    switch nargin

@@ -333,16 +333,20 @@ classdef shp_surface
             %%% [xyz] and the vectors are defined on the sphere at the spherical
             %%% coordinates t and p.
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            [L, K ] = shp_surface.indices_gen(1:(L_max + 1)^2);
-            M = length(L); %% number of functions in expansion
-            N = length(X(:,1)); %% number of data points
-            A  = zeros(N, M, 'double');
-            for S = 1:length(L),
-                A(:,S) = obj.basis.ylk_bosh(L(S),K(S),p(:)',t(:)')';
-            end;
-            [U, S, V] = svd(A, 'econ');invS = 1./(S);invS(invS==inf) = 0;
-            [clks] = (V*invS) * (U'*X);
-            obj.X_o = double(reshape(clks,1,M*3));
+            if sum(isnan(p))==0 && sum(isnan(t))==0
+                [L, K ] = shp_surface.indices_gen(1:(L_max + 1)^2);
+                M = length(L); %% number of functions in expansion
+                N = length(X(:,1)); %% number of data points
+                A  = zeros(N, M, 'double');
+                for S = 1:length(L),
+                    A(:,S) = obj.basis.ylk_bosh(L(S),K(S),p(:)',t(:)')';
+                end;
+                [U, S, V] = svd(A, 'econ');invS = 1./(S);invS(invS==inf) = 0;
+                [clks] = (V*invS) * (U'*X);
+                obj.X_o = double(reshape(clks,1,M*3));
+            else
+                disp('nan found in phi or theta: aborting');
+            end
         end
         function obj = shp_analysis_with_field(obj, X, t, p,sf, L_max)
             %%% The expansion of the three functions X = [x(t,p), y(t,p) z(t,p)] on the sphere.

@@ -18,7 +18,7 @@ end
 
 %if plotflag,disp('Calculating theta mapping');end
 [t, A, b] = surface_mesh.latitude_calc(L, ixN, ixS); %save data_latitude    % Calculate theta (latitude values associated with each vertex)
-if plotflag,dfig;patch('Vertices',X,'Faces',F,'FaceVertexCData',t,'FaceColor','interp', 'EdgeColor','k');axis square;daspect([1 1 1]);rotate3d;view(3);drawnow;end
+if plotflag, figure;patch('Vertices',X,'Faces',F,'FaceVertexCData',t,'FaceColor','interp', 'EdgeColor','k');axis square;daspect([1 1 1]);rotate3d;view(3);drawnow;end
 
 
 %if plotflag,disp('Calculating phi mapping');end
@@ -26,7 +26,7 @@ if plotflag,dfig;patch('Vertices',X,'Faces',F,'FaceVertexCData',t,'FaceColor','i
 [p, A, b, dtline, W] = surface_mesh.longitude_calc(X(:,1), X(:,2), X(:,3),t, A, F, L, ixN, ixS); %save data_longitude
 
 if plotflag
-dfig;patch('Vertices',X,'Faces',F,'FaceVertexCData',p,'FaceColor','interp', 'EdgeColor','k');axis square;daspect([1 1 1]);rotate3d;view(3);drawnow;
-dfig;[u, v, w] = kk_sph2cart(t,p,ones(size(p)));plot_state(u,v,w,F);drawnow
+figure;patch('Vertices',X,'Faces',F,'FaceVertexCData',p,'FaceColor','interp', 'EdgeColor','k');axis square;daspect([1 1 1]);rotate3d;view(3);drawnow;
+figure;[u, v, w] = kk_sph2cart(t,p,ones(size(p)));plot_state(u,v,w,F);drawnow
 end
 % 

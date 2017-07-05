@@ -79,7 +79,8 @@ for iter = 1:numel(Links)
             Lij   = sqrt((V_a(1)-V_e(1))^2 +(V_a(2)-V_e(2))^2+(V_a(3)-V_e(3))^2);
             %% the surface normals are
             n1 = n(r1,:);n2 = n(r2,:);
-            theta(I) = acos(dot(n1,n2));
+            %theta(I) = acos(dot(n1,n2));
+            theta(I) = acos(sum(n1.*n2));
             %%% we need to determine if they are convex or nonconvex
             %%% first let us complete the Hessian normal form of the planes
             %%% of the two intersecting triangles
@@ -88,7 +89,8 @@ for iter = 1:numel(Links)
             %%% Now we need to calculate whether the far point of tr2 lies
             %%% in the half-space of the normal direction (local H is -ve)
             %%% or on the anti-normal direction (local curvature is +ve)
-            s = sign(dot(n1,V_far)+P1);
+            %s = sign(dot(n1,V_far)+P1);
+            s = sign(sum(n1.*V_far)+P1);
             H(ix) = H(ix) + Lij * real(theta(I))/4 * (s); % as in F.J.thesis
         end
     end

@@ -113,14 +113,14 @@ for ix = 1:length(dtline) % as long as we are not at the south pole
     if ix == length(dtline),next = ixS;else next = dtline(ix + 1);end
     % find the list of common vertices between here and prev
     
-    here_links = L{here};   % get the array of links indices of here.
+    here_links = L{here};   % get the array of links indices of here node.
     here_links = here_links(here_links ~= prev);  % the list of those links that are not prev
     here_links = here_links(here_links ~= next);
     
-    prev_links = L{prev};   % get the array of links indices of here.
+    prev_links = L{prev};   % get the array of links indices connected to previous node.
     prev_links = prev_links(prev_links ~= here);  % the list of those links that are not here
     
-    next_links = L{next};   % get the array of links indices of here.
+    next_links = L{next};   % get the array of links indices of next node.
     next_links = next_links(next_links ~= here);  % the list of those links that are not here
     if ix == 1
         common_links = intersect(here_links, prev_links);   % get a list of common links
@@ -179,8 +179,9 @@ end
 
 % %  solve the linear system
 % disp('Solving sparse linear system');
-warning off;
-[L1,U1] = luinc(A,1e-3); warning on;
-[p, flag1, relres1, iter1, resvec1] = bicg(A,b, 1e-6, 1000, L1, U1);
+p = full(A\b);
+% warning off;
+% [L1,U1] = luinc(A,1e-3); warning on;
+% [p, flag1, relres1, iter1, resvec1] = bicg(A,b, 1e-6, 1000, L1, U1);
 
 %p = ([0 p' 0]');
