@@ -23,7 +23,7 @@ patch('vertices',m1.X,'faces',m1.F,'FaceColor','green','edgecolor', 'none');
 hold on;
 h = quiver3(m1.X(:,1), m1.X(:,2),...
     m1.X(:,3),D(:,1),D(:,2),D(:,3),'LineWidth',1.5);
-adjust_quiver_arrowhead_size(h, 2);
+%adjust_quiver_arrowhead_size(h, 2);
 axis off;axis equal; camlight;
 lighting phong;
 view(-90,90);camlight;
