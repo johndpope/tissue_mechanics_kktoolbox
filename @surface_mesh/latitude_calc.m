@@ -1,4 +1,4 @@
-function [t, Ap, b] = latitude_calc3(L, ixN, ixS)
+function [t, Ap, b] = latitude_calc(L, ixN, ixS)
 % Calculate latitude from diffusion as in Brechbuehler 1995
 % Example:
 %        [t, A, b] = latitude_calc(L, ixN, ixS)
@@ -16,7 +16,7 @@ function [t, Ap, b] = latitude_calc3(L, ixN, ixS)
 A = sparse(length(L));     % creates a square zero matrix of size nv
 b = sparse(length(L),1);
 for iv = 1:length(L)      % loop over the cells in L
-    links = L{iv};  % the array that contains the indices of the vertices linked to iv
+    links = L{iv};  %  array that contains  indices of the vertices linked to iv
     A(iv,iv) = length(links);
     for K = 1:length(links)         % loop over the indices that are linked
                 A(iv,links(K)) = -1;               % set all linked elements to -1

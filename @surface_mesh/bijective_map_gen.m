@@ -1,8 +1,8 @@
-function [t,p,dtline, W] = bijective_map_gen(X, F, L, plotflag, ixN, ixS)
+function [t,p,dtline, W, A, b] = bijective_map_gen(X, F, L, plotflag, ixN, ixS)
 %%% Calculate the bijective mapping of X
 if size(X,1) ==3, X = X';end
-if nargin ==4,      % get the indices corresponding to the max and min of z
-    for coord = 1:3,          % set to 1 for x, 2 for y and 3 for z
+if nargin <5      % get the indices corresponding to the max and min of z
+    for coord = 1:3          % set to 1 for x, 2 for y and 3 for z
         c = X(:,coord);
         maxcix = find(c == max(c));
         mincix = find(c == min(c));
@@ -27,6 +27,11 @@ if plotflag, figure;patch('Vertices',X,'Faces',F,'FaceVertexCData',t,'FaceColor'
 
 if plotflag
 figure;patch('Vertices',X,'Faces',F,'FaceVertexCData',p,'FaceColor','interp', 'EdgeColor','k');axis square;daspect([1 1 1]);rotate3d;view(3);drawnow;
-figure;[u, v, w] = kk_sph2cart(t,p,ones(size(p)));plot_state(u,v,w,F);drawnow
+figure;[u, v, w] = kk_sph2cart(t,p,ones(size(p)));
+surface_mesh.plot_state(u,v,w,F);
+figure;hist(t,100);title('theta histogram');
+figure;hist(p,100);title('phi histogram');
+drawnow
+
 end
 % 

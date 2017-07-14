@@ -1,4 +1,4 @@
-function [p, A, b, dtline,W] = longitude_calc4(x, y, z,t, A, F, L, ixN, ixS)
+function [p, A, b, dtline,W] = longitude_calc(x, y, z,t, A, F, L, ixN, ixS)
 % Calculate longitude from diffusion as in Brechbuehler 1995
 % Example:
 %       p = longitude_calc(x, y, z, t, A, L, ixN, ixS)
@@ -22,19 +22,19 @@ function [p, A, b, dtline,W] = longitude_calc4(x, y, z,t, A, F, L, ixN, ixS)
 % Modify the matrix A as in the pseudo-code given on page 158
 % For the north pole
 links = L{ixN};     % obtain the array of indices that the North pole is liked to
-for ix = 1:length(links),       % loop over links
+for ix = 1:length(links)       % loop over links
     A(links(ix),links(ix)) = A(links(ix),links(ix))-1;      % cut the link with the North pole
 end
 % For the south pole
 links = L{ixS};     % obtain the array of indices that the south pole is liked to
-for ix = 1:length(links),       % loop over links
+for ix = 1:length(links)       % loop over links
     A(links(ix),links(ix)) = A(links(ix),links(ix))-1;      % cut the link with the south pole
 end
 %%% Eliminate the ixN and ixS rows and columns in A
 %A = A((1:end)~=ixN & (1:end)~=ixS,(1:end)~=ixN & (1:end)~=ixS);
 %A(:,ixS) = [];A(ixS,:) = [];A(:,ixN) = [];A(ixN,:) = [];
 %%%%%
-A(1,1) = A(1,1) + 2;    % additional condition can be added to any row that is not a pole
+%A(200,200) = A(2,2) + 1000;    % additional condition can be added to any row that is not a pole
 
 % % Setup the vector b
 dtline = [];
@@ -51,8 +51,8 @@ while(here~=ixS)
     counter = counter + 1;if counter>length(L),error('could not determine p');end
     dtline = [dtline here];
     nbrs = L{here}; % get the direct neighbors of here (array of neighbor indices)
-    for ix = 1:length(nbrs),
-        if t(nbrs(ix)) > maximum,
+    for ix = 1:length(nbrs)
+        if t(nbrs(ix)) > maximum
             maximum = t(nbrs(ix));
             nextpos = ix;
         end
@@ -66,7 +66,7 @@ end
 
 
 
-if isempty(dtline),
+if isempty(dtline)
     %%   error('invalid date line !!');end
     nbrs = L{ixN};here = nbrs(1);       % any neighbor of the north pole
     counter = 0;
@@ -93,12 +93,12 @@ end
 %%%%%%%%%%% determine the western links
 % disp('Assigning west and east labels');
 %%%% now that we have the date line dl we need to determine the 
-%%%% relative positions of the vertices that are neighbors of the 
+%%%% relative positions of  vertices that are neighbors of the 
 %%%% points on the date line .
-%%%% Let us loop over the vertices on the date line and exclude the
+%%%% Let us loop over vertices on the date line and exclude 
 %%%% vertices that are on the date line itself from determination as far as
 %%%% east and west is concerned. The info will be stored in 2 arrays E and
-%%%% W that store the indices of the East and West vertices that are also
+%%%% W that store the indices of East and West vertices that are also
 %%%% neighbors
 S   = [x(ixS) y(ixS) z(ixS)];       % Coordinates of the South pole
 N   = [x(ixN) y(ixN) z(ixN)];       % Coordinates of the North pole
@@ -161,11 +161,11 @@ end
 %%%%%%%%%%% Modify b accordingly
 %%%
 % disp('Modifying b');
-for ix = 1:length(dtline),      % loop over the date-line vertices
+for ix = 1:length(dtline)      % loop over the date-line vertices
     dlarr = DL(ix,:);            % retrieve the array [dl_index nW nE]
     b(dtline(ix)) = -dlarr(2)* 2 *pi;   % dl(1) is the vertex index, dl(2) is the # of West linked vertices
 end
-for ix = 1:length(W),       % loop over the West vertices
+for ix = 1:length(W)       % loop over the West vertices
     b(W(ix)) = b(W(ix)) + 2 * pi;   % increment the b vector for every occurence of a West vertex
 end
 
@@ -183,5 +183,5 @@ p = full(A\b);
 % warning off;
 % [L1,U1] = luinc(A,1e-3); warning on;
 % [p, flag1, relres1, iter1, resvec1] = bicg(A,b, 1e-6, 1000, L1, U1);
-
-%p = ([0 p' 0]');
+%
+% p = ([0 p' 0]');

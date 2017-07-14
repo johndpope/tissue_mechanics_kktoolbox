@@ -1,10 +1,7 @@
-function [t,p] = newton_steps(t,p,F,maxiter,flag,filename, verbose)
+function [t,p] = newton_steps( t,p,F,stepfac, maxiter,flag,filename, verbose)
 % Minimizes the areas of triangles (on the sphere) by iteratively
 % calculating new positions t and p for the vertices.
 % The algorithm uses Newton's method iteratively
-% With flag set to anything but 0 or 1, the program doesn't check for the
-% filename and doesn't save the Jacobian matrix.
-
 if nargin<6,filename = 'untitled';verbose = 0;end
 if nargin<7, verbose = 0;end
 nvert = length(t);nfaces = length(F);p = mod(p,2*pi);X = [t(:);p(:)];
@@ -26,13 +23,13 @@ if flag
     JacInd = JacPat;JacInd(indJ) = indJ;    % fill in the jacobian pattern with the indices
     indVertVal = zeros(length(indJ),6);
     pos_vec = zeros(size(indJ));        % gives the position of the variable relative to the face definition
-%     if verbose, h = waitbar(0,'Setting up Jacobian sparsity pattern...');end
+    if verbose, h = waitbar(0,'Setting up Jacobian sparsity pattern...');end
     indcol = zeros(length(indJ), 1, 'uint16');
     indrow = zeros(length(indJ), 1, 'uint16');
     
     %disp('Generating Jacobian sparsity pattern...');
     for ix = 1:length(indJ),        % loop over the Jacobian Pattern non-zeros
-        %if ~mod(ix,5000),disp([num2str(ix) ' of ' num2str(length(indJ))]);end;
+        if ~mod(ix,5000),disp([num2str(ix) ' of ' num2str(length(indJ))]);end;
         [row,col] = ind2sub(size(JacPat),indJ(ix));
         indvec = JacInd(row,:);
         indvec = indvec(indvec>0);
@@ -40,9 +37,9 @@ if flag
         indVertVal(ix,:) = JacInd(indvec);
         indcol(ix)   = col;       %%
         indrow(ix)   = row;
-%         if verbose, waitbar(ix/length(indJ),h);end
+        if verbose, waitbar(ix/length(indJ),h);end
     end
-% if verbose, close(h);end
+if verbose, close(h);end
     Cv = zeros(size(indVertVal));   % the actual coordinates of the faces are stored in here
     indCv = sub2ind(size(Cv),1:length(indJ),pos_vec');
     J = sparse(size(JacPat,1), size(JacPat,2));
@@ -65,7 +62,7 @@ end
 %  We can satisfy the system of equations by taking Newton steps:
 %  We calculate dS by solving the linear system: JT(S).dS = -Areas(S), and then
 %  incrementing S by dS.
-%  The problem is that in general there are more unknowns than there are constraints (equations)
+%  The problem is that in general there are more unknowns than there are contraints (equations)
 %  this means that we have many solutions. We restrict dS to the column space of A
 %  to take the shortes dS possible. So dS can be written as dS = J.dV, and dV is obtianed
 %  by solving the system JT(S).dS = JT(S).J(S).dV = -Areas(S), 
@@ -79,9 +76,7 @@ for iter = 1:maxiter,
     
     %%% we need the triangle areas (Areas) at the current configuration.
     %%% Areas is a column vector of length N-4 (where N is the # of vertices).
-    u(:) = cos(pi/2-t(:)).*cos(p(:));
-    v(:) = cos(pi/2-t(:)).*sin(p(:));
-    w(:) = sin(pi/2-t(:));
+    u(:) = cos(pi/2-t(:)).*cos(p(:));v(:) = cos(pi/2-t(:)).*sin(p(:));w(:) = sin(pi/2-t(:));
     crossqpr = cross([u(F(:,2))-u(F(:,1)) v(F(:,2))-v(F(:,1)) w(F(:,2))-w(F(:,1))],[u(F(:,3))-u(F(:,1)) v(F(:,3))-v(F(:,1)) w(F(:,3))-w(F(:,1))],2);
     Areas = (sqrt(sum(crossqpr.*crossqpr,2)))./2;
     %%% we need the Jacobian (J) at the current step. J is a (N-4) x N matrix
@@ -97,16 +92,13 @@ for iter = 1:maxiter,
     w1 = sin(pi/2-Cv(:,1));w2 = sin(pi/2-Cv(:,2));w3 = sin(pi/2-Cv(:,3));
     crossqpr = cross([u2-u1 v2-v1 w2-w1],[u3-u1 v3-v1 w3-w1],2);
     areas_plus = (sqrt(sum(crossqpr.*crossqpr,2)))./2;
-    
     %     AREASPLUS = JacPat;AREASPLUS(indJ) = areas_plus;
     %     Jvals = (AREASPLUS(indJ)-AREAS(indJ))./CHG(indJ);
     Jvals = (areas_plus-Areas(indrow))./CHG_vec(indcol);
     J(indJ) = Jvals;
     %J = reshape(J,size(JacPat,1),size(JacPat,2));
-    
     J(isnan(J)) = 0;
     J(isinf(J)) = 100;
-    
     %%% Calculate the solution
     %A  = J*J';b = -Areas;
 % % % %     %[dv, flag] = bicgstab(A,b);
@@ -125,7 +117,7 @@ for iter = 1:maxiter,
     %tol = 1e-6;[dv] = lsqr(A,b,tol);
     %dv = A\b;
     %%% and take a step
-    stepfac = .05;
+    %stepfac = .5;
     X = X + stepfac.*J'*dv;
 
     %%% plot current configuration if desired

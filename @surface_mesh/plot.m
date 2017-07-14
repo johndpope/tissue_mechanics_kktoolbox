@@ -97,7 +97,7 @@ end
 axis tight;
 axis equal;
 %if obj.use_camorbit, for i=1:36,camorbit(10,0,'camera');drawnow;end;end
-cameramenu;
+cameratoolbar;
 view(3)
 function plot_mesh_coff_quad(X,F)
     clf;patch(  'vertices',X(:,1:3),'faces',F,...
@@ -113,4 +113,4 @@ axis square;
 axis off;
 axis tight;
 axis equal;
-cameramenu;
+cameratoolbar;

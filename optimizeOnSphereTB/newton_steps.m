@@ -43,7 +43,7 @@ if verbose, close(h);end
     Cv = zeros(size(indVertVal));   % the actual coordinates of the faces are stored in here
     indCv = sub2ind(size(Cv),1:length(indJ),pos_vec');
     J = sparse(size(JacPat,1), size(JacPat,2));
-    seps = sqrt(eps);
+    seps = 1e-5 * sqrt(eps);
     if flag==1, str = sprintf('save data_temp_newton_steps_%s J seps JacPat JacInd indJ indcol indVertVal Cv indCv indvec indrow pos_vec;',filename);eval(str);end
 else
     str = sprintf('load data_temp_newton_steps_%s ;',filename);eval(str);
@@ -70,9 +70,14 @@ end
 %  Note the symbol S has been subsituted by X in the code
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%$%%%
 warning off;
+figure;
+normdV = zeros(maxiter,1);
 for iter = 1:maxiter,
     if verbose, disp(iter);end
-    t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
+    t = [ X(1:(nvert))]; 
+    %t = mod(t,pi);
+    p = [X(nvert+1:end)];
+    p = mod(p,2*pi);
     
     %%% we need the triangle areas (Areas) at the current configuration.
     %%% Areas is a column vector of length N-4 (where N is the # of vertices).
@@ -108,29 +113,48 @@ for iter = 1:maxiter,
         
 %     [dv,flag4,relres4,iter4,resvec4]  = gmres(J*J',-Areas,2, 5e-1, 20);
     
-    [dv,flag4,relres4,iter4,resvec4]  = gmres(J*J',-Areas,1, 5e0, 10);
-
-
+     [dv,flag4,relres4,iter4,resvec4]  = gmres(J*J',-Areas,1, 5e0, 10);
+   %    [dv, flag] = bicgstab(J*J', -Areas);
+  % dv = (J*J')\(-Areas);
+    normdV(iter) = (norm(dv));
 %    dv = gmres(A,b);
     %dv = pcg(A,b,1e-3,10);
     %dv = symmlq(A,b);
     %tol = 1e-6;[dv] = lsqr(A,b,tol);
     %dv = A\b;
     %%% and take a step
-    stepfac = .5;
-    X = X + stepfac.*J'*dv;
+    stepfac = 0.5;
+    dX = stepfac.*J'*dv;
+    X = X + dX;
 
     %%% plot current configuration if desired
-    t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
-    u(:) = cos(pi/2-t(:)).*cos(p(:));v(:) = cos(pi/2-t(:)).*sin(p(:));w(:) = sin(pi/2-t(:));
-    if verbose==2, clf; patch('Vertices',[u v w],'Faces',F,'FaceVertexCData', hsv(size(F,1)),'FaceColor','flat');axis square;view(-276,4);zoom(1);drawnow;end
+    t = [ X(1:(nvert))]; 
+    %t = mod(t, pi);
+    p = [X(nvert+1:end)];
+    p = mod(p,2*pi);
+    u(:) = cos(pi/2-t(:)).*cos(p(:));
+    v(:) = cos(pi/2-t(:)).*sin(p(:));
+    w(:) = sin(pi/2-t(:));
+    if verbose==2
+        subplot(2,2,1); cla;
+        patch('Vertices',[u v w],'Faces',F,'FaceVertexCData',...
+            hsv(size(F,1)),'FaceColor','flat');
+        axis square;
+        view(-276,4);
+        subplot(2,2,2); plot(normdV);
+        subplot(2,2,3); cla;hist(t,100); title('theta -- histogram');
+        subplot(2,2,4); cla;hist(p, 100); title('phi -- histogram');
+        drawnow;
+    end
     
 
 end
-%%% plot current configuration if desired
-t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
-u(:) = cos(pi/2-t(:)).*cos(p(:));v(:) = cos(pi/2-t(:)).*sin(p(:));w(:) = sin(pi/2-t(:));
-if verbose, clf; patch('Vertices',[u v w],'Faces',F,'FaceVertexCData', hsv(size(F,1)),'FaceColor','flat');axis square;view(-123,-18);zoom(1);drawnow;end
+% %%% plot current configuration if desired
+% t = [ X(1:(nvert))];p = [X(nvert+1:end)];p = mod(p,2*pi);
+% u(:) = cos(pi/2-t(:)).*cos(p(:));v(:) = cos(pi/2-t(:)).*sin(p(:));w(:) = sin(pi/2-t(:));
+% % if verbose, clf; patch('Vertices',[u v w],'Faces',F,'FaceVertexCData', hsv(size(F,1)),'FaceColor','flat');axis square;view(-123,-18);zoom(1);drawnow;end
+
+
 
 warning on;
 

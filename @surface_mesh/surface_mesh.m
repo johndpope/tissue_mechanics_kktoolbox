@@ -38,9 +38,11 @@ classdef surface_mesh
         [t,p,dtline, W] = bijective_map_gen(X, F, L, plotflag, ixN, ixS);
         [t, Ap, b] = latitude_calc(L, ixN, ixS);
         [p, A, b, dtline,W] = longitude_calc(x, y, z,t, A, F, L, ixN, ixS);
-        [t,p] = newton_steps_02( t,p,F,F_areas,newton_step,maxiter,verbose);
+        %[t,p] = newton_steps(t,p,F,maxiter,flag,filename, verbose)
         mesh2raw(X,F, fn);
         raw2stl(fn1,fn2);
+        %%%% visualization
+        plot_state(u, v, w, F, count, flag, az, el);
     end
     methods
         function obj = surface_mesh(X,F)
@@ -64,7 +66,7 @@ classdef surface_mesh
                 nfaces = length(obj.F);
                 if size(obj.F,1)==3, obj.F = obj.F';end
                 if size(obj.X,1)==3, obj.X = obj.X';end
-                if (nvert*2-4~=nfaces), 
+                if (nvert*2-4~=nfaces),
                     disp('Mesh does not represent a closed shape (for triangulations)');
                     obj.isclosed_shape = 0;
                 end
@@ -96,6 +98,9 @@ classdef surface_mesh
                 end
                 obj.needs_edge_info = 0;
             end
+            %%% filter out any duplicates
+            obj.E = sort(obj.E,2);
+            obj.E = unique(obj.E, 'rows');
         end
         function obj = map2sphere(obj, t, p)
             if obj.needs_map2sphere
@@ -123,12 +128,22 @@ classdef surface_mesh
                 end
                 if obj.optimization_method == 1
                     if size(obj.F,2)==3
-                    %% using simple Newton iterations as in Khairy and Howard 2008 (MEDIA)
-                    disp('Performing area preservation optimization only using gmres. Using planar approximation for triangles.');
-%                    warning('under testing --- works best with high quality meshes');
-                    [obj.t obj.p] = obj.newton_steps_02( obj.t, obj.p,obj.F,obj.F_areas,...
-                        obj.newton_step,obj.newton_niter, obj.mapping_plot_flag);%#ok<PROP> %%%% Constrained optimization for uniform parametrization
-                    obj.needs_map2sphere = 0;
+                        
+                        %% using simple Newton iterations as in Khairy and Howard 2008 (MEDIA)
+                        disp('Performing area preservation optimization. Using planar approximation for triangles.');
+                        %                    warning('under testing --- works best with high quality meshes');
+                        
+                        [obj.t, obj.p] = ...
+                            newton_steps(...
+                            obj.t,...
+                            obj.p,...
+                            obj.F,...
+                            obj.newton_niter,...
+                            2, ...
+                            [], ...
+                            2);%%%%%%%%%%%%%%%%%Constrained optimization for uniform parametrization
+                        
+                        obj.needs_map2sphere = 0;
                     elseif size(obj.F,2)==4
                         disp('Mapping optimization implementation for quad meshes is still in progress.');
                         obj.F_areas = qarea(obj.X, obj.F);
@@ -138,24 +153,24 @@ classdef surface_mesh
                             obj.F_areas, obj.newton_step, obj.newton_niter);
                     end
                     
-% %                 elseif obj.optimization_method == 2
-% %                     %% we need to also preserve angles (not only areas), i.e. resist shear deformation
-% %                     disp('Not calculating starting value for bijective mappin. Performing Gu Wang 2004.');
-% %                     [t p] = conformal_spherical_mapping_Gu(obj.X,obj.F);
-% %                     obj.t = t;
-% %                     obj.p = p;
-% %                     obj.needs_map2sphere = 0;
-% %                 elseif obj.optimization_method == 3
-% %                     disp('Performing Gu Wang 2004, using bijective map as starting values');
-% %                     [t p] = conformal_spherical_mapping_Gu(obj.X,obj.F, obj.t, obj.p);
-% %                     obj.t = t;
-% %                     obj.p = p;
-% %                     obj.needs_map2sphere = 0;
-% %                 elseif obj.optimization_method == 4
-% %                     %% preserve angles and use large scale matlab optimization
-% %                     disp('Performing both area and angle preservation optimization on the sphere using geodesic triangle calculation and matlabs large scale optimization');
-% %                     obj = optimize_on_sphere(obj);
-% %                     obj.needs_map2sphere = 0;
+                    % %                 elseif obj.optimization_method == 2
+                    % %                     %% we need to also preserve angles (not only areas), i.e. resist shear deformation
+                    % %                     disp('Not calculating starting value for bijective mappin. Performing Gu Wang 2004.');
+                    % %                     [t p] = conformal_spherical_mapping_Gu(obj.X,obj.F);
+                    % %                     obj.t = t;
+                    % %                     obj.p = p;
+                    % %                     obj.needs_map2sphere = 0;
+                    % %                 elseif obj.optimization_method == 3
+                    % %                     disp('Performing Gu Wang 2004, using bijective map as starting values');
+                    % %                     [t p] = conformal_spherical_mapping_Gu(obj.X,obj.F, obj.t, obj.p);
+                    % %                     obj.t = t;
+                    % %                     obj.p = p;
+                    % %                     obj.needs_map2sphere = 0;
+                    % %                 elseif obj.optimization_method == 4
+                    % %                     %% preserve angles and use large scale matlab optimization
+                    % %                     disp('Performing both area and angle preservation optimization on the sphere using geodesic triangle calculation and matlabs large scale optimization');
+                    % %                     obj = optimize_on_sphere(obj);
+                    % %                     obj.needs_map2sphere = 0;
                 else
                     warning('No optimization performed');
                 end
@@ -233,7 +248,7 @@ classdef surface_mesh
             twoA = sqrt(sum(crossqpr.^2,2));   % take the norm
             A = sum(twoA)/2;                    % this is the total area
             F_areas = twoA/2;                   % this is the vector of face areas
-           
+            
             %%% for triangle quality determination
             p = [x3-x2 y3-y2 z3-z2];
             d1 = sqrt(q(:,1).^2 + q(:,2).^2 + q(:,3).^2);
@@ -249,7 +264,7 @@ classdef surface_mesh
             % assuming F2 to be n x 3 and X2 as well
             g  = size(obj.X,1);
             g = [g g g];
-            g = g(ones(size(F2, 1),1),:);   
+            g = g(ones(size(F2, 1),1),:);
             obj.F = [obj.F;F2 + g];
             obj.X = [obj.X;X2];
             obj.needs_updating = 1;
@@ -275,23 +290,23 @@ classdef surface_mesh
             
             
             % merge the new sets of vertices and faces:assuming F2 to be n x 3 and X2 as well
-% %             g  = size(obj.X,1);
-% %             g = [g g g];
-% %             g = g(ones(size(F2, 1),1),:);   
-% %             obj.F = [obj.F;F2 + g];
-% %             obj.X = [obj.X;X2];
-% %             %%% now we need to find a proper hull that engulfs all the
-% %             %%% vertices and produces a new mesh
-% %             [ center, radii, evecs, v ] = ellipsoid_fit( obj.X);
-% %             obj.F = convhulln(double(obj.X));
-% %             obj = optimize_mesh(obj);
-% %             %%
-% %             obj.needs_updating = 1;
-% %             obj.needs_edge_info = 1;
-% %             obj.needs_map2sphere = 1;
+            % %             g  = size(obj.X,1);
+            % %             g = [g g g];
+            % %             g = g(ones(size(F2, 1),1),:);
+            % %             obj.F = [obj.F;F2 + g];
+            % %             obj.X = [obj.X;X2];
+            % %             %%% now we need to find a proper hull that engulfs all the
+            % %             %%% vertices and produces a new mesh
+            % %             [ center, radii, evecs, v ] = ellipsoid_fit( obj.X);
+            % %             obj.F = convhulln(double(obj.X));
+            % %             obj = optimize_mesh(obj);
+            % %             %%
+            % %             obj.needs_updating = 1;
+            % %             obj.needs_edge_info = 1;
+            % %             obj.needs_map2sphere = 1;
         end
         function obj = baloon(obj)
-            %%%% simulate blowing up of a baloon  
+            %%%% simulate blowing up of a baloon
             niter =300;
             Afac = 2.0;
             maxdX = inf;%0.1;
@@ -317,10 +332,10 @@ classdef surface_mesh
                 %trifacb  = 1-full(beta);
                 %trifaca  = 1-F_areas/F_areas_o;
                 %clf;subplot(2,1,1);hist(ai);subplot(2,1,2);hist(beta);drawnow;
-% %                 for(ix = 1:size(X,1))
-% %                     vfac(ix) = mean(trifacb(face_memb{ix}));
-% % %                     vfac(ix) = vfac(ix) + mean(trifaca(face_memb{ix}));
-% %                 end
+                % %                 for(ix = 1:size(X,1))
+                % %                     vfac(ix) = mean(trifacb(face_memb{ix}));
+                % % %                     vfac(ix) = vfac(ix) + mean(trifaca(face_memb{ix}));
+                % %                 end
                 fac  = 0.01;%(vfac)/2;
                 mag = H.*fac;
                 mag(mag>maxdX) = maxdX;
@@ -334,11 +349,45 @@ classdef surface_mesh
                 drawnow;
                 cameramenu;
                 
-%                 dfig(4);cla;
-%                 quiver3(X(:,1), X(:,2), X(:,3), N(:,1), N(:,2), N(:,3));
-%                 drawnow;
+                %                 dfig(4);cla;
+                %                 quiver3(X(:,1), X(:,2), X(:,3), N(:,1), N(:,2), N(:,3));
+                %                 drawnow;
                 
             end
+        end
+        function tri = get_triangulation(obj)
+            tri = triangulation(obj.F, obj.X);
+        end
+        function edge_prop = vertex_prop_to_edge_prop(obj, v_prop)
+           % convert a node (or vertex) propery v_prop to an edge property
+           % example: local curvature is assigend per vertex, but for the
+           % graph weight we need it to be an edge propery
+           assert(size(v_prop,1)==size(obj.X,1), 'property not of correct size');
+           obj = obj.edge_info;
+           edge_prop = zeros(size(obj.E,1),1);
+           for eix = 1:size(obj.E)  % loop over edges
+              v1 = obj.E(eix,1);
+              v2 = obj.E(eix,2);
+              edge_prop(eix) = (obj.H(v2)+obj.H(v1))/2; % just take the average
+           end
+           
+            
+        end
+        function [G, d, ixN, ixS] = get_graph(obj)
+            obj = obj.edge_info;
+%             A = sparse(size(obj.X,1), size(obj.X,1));
+%             A(obj.E(:,1), obj.E(:,2)) = 1;
+            %%% calculate local curvature and assign edge weights
+            obj = obj.props;
+            weights = vertex_prop_to_edge_prop(obj, obj.H);
+            weights = weights-min(weights);
+            weights = weights + median(weights);  % just a reasonable shift
+            weights = 1./weights;
+            G = graph(obj.E(:,1), obj.E(:,2), weights);
+            d = distances(G);
+            [ixN, ixS] = ind2sub(size(d), find(d==max(d(:)))); % maximum curvature-based distance
+            ixN = ixN(1);
+            ixS = ixS(1);
         end
     end
 end
