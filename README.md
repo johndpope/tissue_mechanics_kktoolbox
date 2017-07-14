@@ -9,5 +9,5 @@ In Matlab
 s = shp_surface('discocyte');  % initializes an shp object, populates the coefficient vector with discocyte-coefficients and calculates the energy
 figure;plot_pretty(s); % look at the surface
 figure; plot_H(s); % plots the surface colored with local mean curvature
-disp(s); % lists energy
+disp(s); % lists member variables of s including its bending energy
 ```
